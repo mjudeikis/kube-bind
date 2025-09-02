@@ -37,6 +37,10 @@ spec:
     resource: customresourcedefinitions
     verbs:
     - '*'
+  - group: apis.kcp.io
+    resource: apiresourceschemas
+    verbs:
+    - '*'
   resources:
   - group: kube-bind.io
     name: apiconversions
@@ -60,7 +64,7 @@ spec:
       crd: {}
   - group: kube-bind.io
     name: apiserviceexports
-    schema: v250809-5ed76a1.apiserviceexports.kube-bind.io
+    schema: v250902-878858c.apiserviceexports.kube-bind.io
     storage:
       crd: {}
   - group: kube-bind.io
@@ -71,6 +75,11 @@ spec:
   - group: kube-bind.io
     name: boundapiresourceschemas
     schema: v250809-5ed76a1.boundapiresourceschemas.kube-bind.io
+    storage:
+      crd: {}
+  - group: kube-bind.io
+    name: boundschemas
+    schema: v250902-878858c.boundschemas.kube-bind.io
     storage:
       crd: {}
   - group: kube-bind.io
