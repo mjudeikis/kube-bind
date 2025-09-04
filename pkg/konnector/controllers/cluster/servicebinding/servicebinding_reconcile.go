@@ -27,7 +27,6 @@ import (
 	"k8s.io/utils/ptr"
 
 	kubebindv1alpha2 "github.com/kube-bind/kube-bind/sdk/apis/kubebind/v1alpha2"
-	"github.com/kube-bind/kube-bind/sdk/apis/kubebind/v1alpha2/helpers"
 	kubebindhelpers "github.com/kube-bind/kube-bind/sdk/apis/kubebind/v1alpha2/helpers"
 	conditionsapi "github.com/kube-bind/kube-bind/sdk/apis/third_party/conditions/apis/conditions/v1alpha1"
 	"github.com/kube-bind/kube-bind/sdk/apis/third_party/conditions/util/conditions"
@@ -189,7 +188,7 @@ func (r *reconciler) referenceBoundAPIResourceSchema(ctx context.Context, bindin
 
 func (r *reconciler) ensureCRDsFromBoundSchema(ctx context.Context, binding *kubebindv1alpha2.APIServiceBinding, schema *kubebindv1alpha2.BoundSchema) error {
 	var errs []error
-	crd := helpers.BoundSchemaToCRD(schema)
+	crd := kubebindhelpers.BoundSchemaToCRD(schema)
 
 	newReference := metav1.OwnerReference{
 		APIVersion: kubebindv1alpha2.SchemeGroupVersion.String(),

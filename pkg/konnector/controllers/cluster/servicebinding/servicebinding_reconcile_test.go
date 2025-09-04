@@ -126,7 +126,6 @@ func newBoundSchema(name, namespace string, group, plural string) *kubebindv1alp
 	}
 }
 
-
 func newServiceExportWithResources(name, namespace string, resources []kubebindv1alpha2.APIServiceExportRequestResource) *kubebindv1alpha2.APIServiceExport {
 	return &kubebindv1alpha2.APIServiceExport{
 		ObjectMeta: metav1.ObjectMeta{

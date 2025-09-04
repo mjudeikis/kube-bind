@@ -110,8 +110,6 @@ func newCRD(name string, conditions []apiextensionsv1.CustomResourceDefinitionCo
 	}
 }
 
-
-
 func newGetBoundSchema(_ context.Context, boundSchema *kubebindv1alpha2.BoundSchema) func(ctx context.Context, name string) (*kubebindv1alpha2.BoundSchema, error) {
 	return func(ctx context.Context, name string) (*kubebindv1alpha2.BoundSchema, error) {
 		if name == boundSchema.Name {
