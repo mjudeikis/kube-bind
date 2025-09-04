@@ -169,11 +169,9 @@ func BoundSchemaToCRD(schema *kubebindv1alpha2.BoundSchema) *apiextensionsv1.Cus
 			Subresources:             &version.Subresources,
 		}
 		if len(version.Schema.Raw) > 0 {
-			var jsonSchema apiextensionsv1.JSONSchemaProps
+			var jsonSchema apiextensionsv1.CustomResourceValidation
 			if err := json.Unmarshal(version.Schema.Raw, &jsonSchema); err == nil {
-				crdVersion.Schema = &apiextensionsv1.CustomResourceValidation{
-					OpenAPIV3Schema: &jsonSchema,
-				}
+				crdVersion.Schema = &jsonSchema
 			}
 		}
 

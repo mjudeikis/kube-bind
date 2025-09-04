@@ -22,7 +22,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -55,7 +54,6 @@ type reconciler struct {
 }
 
 func (r *reconciler) reconcile(ctx context.Context, mapper meta.RESTMapper, cl client.Client, cache cache.Cache, req *kubebindv1alpha2.APIServiceExportRequest) error {
-	spew.Dump(req)
 	if err := r.ensureBoundSchemas(ctx, mapper, cl, cache, req); err != nil {
 		return err
 	}
@@ -120,7 +118,6 @@ func (r *reconciler) ensureBoundSchemas(ctx context.Context, mapper meta.RESTMap
 			}
 			plural := names.(map[string]interface{})["plural"]
 
-			spew.Dump("checking", group, plural, "against", res.Group, res.Resource)
 			if group == res.Group && plural == res.Resource {
 				boundSchema, err := helpers.UnstructuredToBoundSchema(item)
 				if err != nil {

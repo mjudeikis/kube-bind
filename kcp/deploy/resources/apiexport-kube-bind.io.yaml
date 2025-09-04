@@ -48,11 +48,6 @@ spec:
     storage:
       crd: {}
   - group: kube-bind.io
-    name: apiresourceschemas
-    schema: v250809-5ed76a1.apiresourceschemas.kube-bind.io
-    storage:
-      crd: {}
-  - group: kube-bind.io
     name: apiservicebindings
     schema: v250809-5ed76a1.apiservicebindings.kube-bind.io
     storage:
@@ -70,11 +65,6 @@ spec:
   - group: kube-bind.io
     name: apiservicenamespaces
     schema: v250809-5ed76a1.apiservicenamespaces.kube-bind.io
-    storage:
-      crd: {}
-  - group: kube-bind.io
-    name: boundapiresourceschemas
-    schema: v250809-5ed76a1.boundapiresourceschemas.kube-bind.io
     storage:
       crd: {}
   - group: kube-bind.io
