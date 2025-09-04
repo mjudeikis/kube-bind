@@ -52,7 +52,7 @@ func (r *reconciler) reconcile(ctx context.Context, cache cache.Cache, export *k
 
 func (r *reconciler) ensureSchema(ctx context.Context, cache cache.Cache, export *kubebindv1alpha2.APIServiceExport) (specChanged bool, err error) {
 	logger := klog.FromContext(ctx)
-	var schemas []*kubebindv1alpha2.BoundSchema
+	schemas := make([]*kubebindv1alpha2.BoundSchema, 0, len(export.Spec.Resources))
 
 	for _, res := range export.Spec.Resources {
 		name := res.Resource + "." + res.Group

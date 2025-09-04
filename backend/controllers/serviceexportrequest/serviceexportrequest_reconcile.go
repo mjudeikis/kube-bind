@@ -180,9 +180,6 @@ func (r *reconciler) ensureExports(ctx context.Context, cl client.Client, cache 
 
 		if _, err := r.getServiceExport(ctx, cache, req.Namespace, req.Name); err != nil && !apierrors.IsNotFound(err) {
 			return err
-		} else if err == nil {
-			// ServiceExport already exists, update it.
-			// TODO(mjudeikis): Check hash and update.
 		}
 
 		hash := helpers.BoundSchemasSpecHash(schemas)
@@ -224,7 +221,6 @@ func (r *reconciler) ensureExports(ctx context.Context, cl client.Client, cache 
 			req.Status.Phase = kubebindv1alpha2.APIServiceExportRequestPhaseFailed
 			req.Status.TerminalMessage = conditions.GetMessage(req, kubebindv1alpha2.APIServiceExportRequestConditionExportsReady)
 		}
-
 	}
 
 	if time.Since(req.CreationTimestamp.Time) > 10*time.Minute {
