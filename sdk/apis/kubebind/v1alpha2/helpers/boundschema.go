@@ -20,6 +20,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -168,10 +169,21 @@ func BoundSchemaToCRD(schema *kubebindv1alpha2.BoundSchema) *apiextensionsv1.Cus
 			AdditionalPrinterColumns: version.AdditionalPrinterColumns,
 			Subresources:             &version.Subresources,
 		}
+		// Now schema can be openapiv3 or v2.
+		// we do some poor man checking:
 		if len(version.Schema.Raw) > 0 {
-			var jsonSchema apiextensionsv1.CustomResourceValidation
-			if err := json.Unmarshal(version.Schema.Raw, &jsonSchema); err == nil {
-				crdVersion.Schema = &jsonSchema
+			if strings.Contains(string(version.Schema.Raw), "openAPIV3Schema") {
+				var jsonSchema apiextensionsv1.CustomResourceValidation // we need to unmarshal into the correct type
+				if err := json.Unmarshal(version.Schema.Raw, &jsonSchema); err == nil {
+					crdVersion.Schema = &jsonSchema
+				}
+			} else {
+				var jsonSchema apiextensionsv1.JSONSchemaProps
+				if err := json.Unmarshal(version.Schema.Raw, &jsonSchema); err == nil {
+					crdVersion.Schema = &apiextensionsv1.CustomResourceValidation{
+						OpenAPIV3Schema: &jsonSchema,
+					}
+				}
 			}
 		}
 

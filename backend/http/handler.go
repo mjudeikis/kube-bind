@@ -116,6 +116,12 @@ func (h *handler) AddRoutes(mux *mux.Router) {
 	mux.HandleFunc("/authorize", h.handleAuthorize).Methods("GET")
 
 	mux.HandleFunc("/callback", h.handleCallback).Methods("GET")
+	mux.HandleFunc("/healthz", h.handleHealthz).Methods("GET")
+}
+
+func (h *handler) handleHealthz(w http.ResponseWriter, r *http.Request) {
+	prepareNoCache(w)
+	w.WriteHeader(http.StatusOK)
 }
 
 func (h *handler) handleServiceExport(w http.ResponseWriter, r *http.Request) {
