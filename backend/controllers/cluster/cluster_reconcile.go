@@ -28,16 +28,29 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
+	kuberesources "github.com/kube-bind/kube-bind/backend/kubernetes/resources"
 	kubebindv1alpha2 "github.com/kube-bind/kube-bind/sdk/apis/kubebind/v1alpha2"
 )
 
 type reconciler struct {
 	allowedGroups []string
 	allowedUsers  []string
+
+	clusterIdentityGenerator kuberesources.ClusterIdentityGeneratorFunc
 }
 
 func (r *reconciler) reconcile(ctx context.Context, client client.Client, _ cache.Cache, cluster *kubebindv1alpha2.Cluster) error {
 	var errs []error
+
+	clusterIdentity, err := r.clusterIdentityGenerator(ctx, client, cluster)
+	if err != nil {
+		errs = append(errs, err)
+	}
+	if clusterIdentity == nil {
+		errs = append(errs, errors.NewBadRequest("generated cluster identity is nil")) // This should not happend but just in case.
+		return utilerrors.NewAggregate(errs)
+	}
+	cluster.Status.ClusterIdentity = *clusterIdentity
 
 	if err := r.ensureOIDCRBAC(ctx, client, cluster); err != nil {
 		errs = append(errs, err)

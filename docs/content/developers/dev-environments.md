@@ -61,7 +61,7 @@ All the instructions assume you have already cloned the kube-bind repository and
     --pretty-name="BigCorp.com" \
     --namespace-prefix="kube-bind-" \
     --schema-source apiresourceschemas \
-    --consumer-scope=cluster
+    --consumer-scope=cluster --frontend=http://localhost:3000
     ```
     optionally add `--fronend=http://localhost:3000` to point to local frontend (must be running separately).
 

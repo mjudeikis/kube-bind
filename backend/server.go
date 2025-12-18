@@ -207,6 +207,7 @@ func NewServer(ctx context.Context, c *Config) (*Server, error) {
 		ctx,
 		s.Config.Manager,
 		opts,
+		s.Config.ClusterIdentityGenerator,
 		c.Options.OIDC.AllowedGroups,
 		c.Options.OIDC.AllowedUsers,
 	)

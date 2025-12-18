@@ -64,6 +64,8 @@ func (in *Cluster) SetConditions(conditions conditionsapi.Conditions) {
 
 // ClusterSpec represents the data in the newly created Cluster.
 type ClusterSpec struct {
+	// prettyName is a user-friendly name for the cluster.
+	PrettyName string `json:"prettyName,omitempty"`
 }
 
 // ClusterStatus stores status information about a service binding. It is
@@ -72,6 +74,17 @@ type ClusterStatus struct {
 	// conditions is a list of conditions that apply to the ClusterBinding. It is
 	// updated by the konnector and the service provider.
 	Conditions conditionsapi.Conditions `json:"conditions,omitempty"`
+
+	// clusterIdentity contains information that uniquely identifies the cluster.
+	ClusterIdentity ClusterIdentity `json:"clusterIdentity,omitempty"`
+}
+
+// ClusterIdentity contains information that uniquely identifies the cluster.
+type ClusterIdentity struct {
+	// uid is the unique identifier of the cluster.
+	UID string `json:"uid,omitempty"`
+	// name is the name of the cluster.
+	Name string `json:"name,omitempty"`
 }
 
 // ClusterList is the objects list that represents the Cluster.

@@ -69,6 +69,13 @@ type BindAPIServiceOptions struct {
 	DryRun   bool
 	Template string
 	Name     string
+
+	// ClusterPrettyName is a human friendly name for the cluster.
+	ClusterPrettyName string
+	// ClusterIdentity is a unique identity for the cluster.
+	ClusterIdentity string
+	// clusterIdentityNamespaceName is the namespace name, from which the cluster identity will be generated.
+	clusterIdentityNamespaceName string
 }
 
 // NewBindAPIServiceOptions returns new BindAPIServiceOptions.
@@ -96,8 +103,12 @@ func (b *BindAPIServiceOptions) AddCmdFlags(cmd *cobra.Command) {
 	cmd.Flags().BoolVar(&b.SkipKonnector, "skip-konnector", b.SkipKonnector, "Skip the deployment of the konnector")
 	cmd.Flags().BoolVar(&b.DowngradeKonnector, "downgrade-konnector", b.DowngradeKonnector, "Downgrade the konnector to the version of the kubectl-bind-apiservice binary")
 	cmd.Flags().StringVar(&b.KonnectorImageOverride, "konnector-image", b.KonnectorImageOverride, "The konnector image to use")
-	cmd.Flags().BoolVarP(&b.DryRun, "dry-run", "d", b.DryRun, "If true, only print the requests that would be sent to the service provider after authentication, without actually binding.")
 	cmd.Flags().MarkHidden("konnector-image") //nolint:errcheck
+	cmd.Flags().BoolVarP(&b.DryRun, "dry-run", "d", b.DryRun, "If true, only print the requests that would be sent to the service provider after authentication, without actually binding.")
+	cmd.Flags().StringVarP(&b.ClusterPrettyName, "cluster-pretty-name", "", b.ClusterPrettyName, "A human friendly name for the cluster. If not provided, the cluster identity will be used.")
+	cmd.Flags().StringVarP(&b.ClusterIdentity, "cluster-identity", "", b.ClusterIdentity, "A unique identity for the cluster. If not provided, it will be generated based on the local cluster information. ")
+	cmd.Flags().StringVarP(&b.clusterIdentityNamespaceName, "cluster-identity-namespace", "kube-system", b.clusterIdentityNamespaceName, "The namespace name from which the cluster identity will be generated. Only used if cluster-identity is not provided.")
+	cmd.Flags().MarkHidden("cluster-identity-namespace") //nolint:errcheck
 	cmd.Flags().BoolVar(&b.NoBanner, "no-banner", b.NoBanner, "Do not show the red banner")
 	cmd.Flags().MarkHidden("no-banner") //nolint:errcheck
 	cmd.Flags().StringSliceVarP(&b.KonnectorHostAlias, "konnector-host-alias", "", []string{}, "Add a host alias to the konnector pods in the format IP:hostname1,hostname2")
@@ -185,16 +196,20 @@ func (b *BindAPIServiceOptions) Run(ctx context.Context) error {
 
 	// Use the shared binder to create bindings
 	binderOpts := &BinderOptions{
-		IOStreams:                 b.Options.IOStreams,
-		SkipKonnector:             b.SkipKonnector,
-		KonnectorImageOverride:    b.KonnectorImageOverride,
-		KonnectorHostAliasParsed:  b.KonnectorHostAliasParsed,
-		DowngradeKonnector:        b.DowngradeKonnector,
-		RemoteKubeconfigFile:      b.remoteKubeconfigFile,
-		RemoteKubeconfigNamespace: b.remoteKubeconfigNamespace,
-		RemoteKubeconfigName:      b.remoteKubeconfigName,
-		RemoteNamespace:           b.remoteNamespace,
-		File:                      b.file,
+		IOStreams:                    b.Options.IOStreams,
+		SkipKonnector:                b.SkipKonnector,
+		KonnectorImageOverride:       b.KonnectorImageOverride,
+		KonnectorHostAliasParsed:     b.KonnectorHostAliasParsed,
+		DowngradeKonnector:           b.DowngradeKonnector,
+		RemoteKubeconfigFile:         b.remoteKubeconfigFile,
+		RemoteKubeconfigNamespace:    b.remoteKubeconfigNamespace,
+		RemoteKubeconfigName:         b.remoteKubeconfigName,
+		RemoteNamespace:              b.remoteNamespace,
+		ClusterIdentity:              b.ClusterIdentity,
+		ClusterPrettyName:            b.ClusterPrettyName,
+		ClusterIdentityNamespaceName: b.clusterIdentityNamespaceName,
+		DryRun:                       b.DryRun,
+		File:                         b.file,
 	}
 	binder := NewBinder(config, binderOpts)
 
@@ -318,6 +333,22 @@ func (b *BindAPIServiceOptions) bindTemplate(ctx context.Context) (*bindTemplate
 	client, err := b.Options.GetAuthenticatedClient()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create authenticated client: %w", err)
+	}
+
+	if b.DryRun {
+		fmt.Fprintf(b.Options.IOStreams.ErrOut, "🔍 Dry run mode enabled, no changes will be made to the remote cluster.\n")
+		if b.ClusterIdentity == "" {
+			fmt.Fprintf(b.Options.IOStreams.ErrOut, "⚠️  Warning: Cluster identity not provided, it will be generated based on the local cluster information which may lead to unexpected results if same identity is re-used. Be warrned of the dragons! \n")
+			ns, err := kubeClient.CoreV1().Namespaces().Get(ctx, b.clusterIdentityNamespaceName, metav1.GetOptions{}) // just to trigger possible errors early
+			if err != nil {
+				return nil, fmt.Errorf("failed to get namespace %q for cluster identity generation: %w", b.clusterIdentityNamespaceName, err)
+			}
+			fmt.Fprintf(b.Options.IOStreams.ErrOut, "   Using namespace %q with UID %q for cluster identity generation.\n", ns.Name, ns.UID)
+			b.ClusterIdentity = string(ns.UID)
+			if b.ClusterPrettyName == "" {
+				b.ClusterPrettyName = string(ns.UID)
+			}
+		}
 	}
 
 	bindRequest := &kubebindv1alpha2.BindableResourcesRequest{

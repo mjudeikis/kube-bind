@@ -17,10 +17,12 @@ limitations under the License.
 package konnector
 
 import (
+	"context"
 	"time"
 
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apiextensionsinformers "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeinformers "k8s.io/client-go/informers"
 	kubernetesclient "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -42,6 +44,11 @@ type Config struct {
 	ApiextensionsInformers apiextensionsinformers.SharedInformerFactory
 
 	ServerAddr string
+
+	// ClusterIdentity is uniuqe identity of the cluster. Value is taked from LeaseNamepace UID.
+	ClusterIdentity string
+	// ClusterName is a pretty name of the cluster. If not set, ClusterIdentity is used.
+	ClusterName string
 }
 
 func NewConfig(options *options.CompletedOptions) (*Config, error) {
@@ -75,5 +82,31 @@ func NewConfig(options *options.CompletedOptions) (*Config, error) {
 	config.BindInformers = bindinformers.NewSharedInformerFactory(config.BindClient, time.Minute*30)
 	config.ApiextensionsInformers = apiextensionsinformers.NewSharedInformerFactory(config.ApiextensionsClient, time.Minute*30)
 
+	if err := setupClusterIdentity(config, options); err != nil {
+		return nil, err
+	}
+
 	return config, nil
+}
+
+// setupClusterIdentity sets up ClusterIdentity and ClusterName in the config.
+func setupClusterIdentity(config *Config, options *options.CompletedOptions) error {
+	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(ctx, time.Minute)
+	defer cancel()
+
+	ns, err := config.KubeClient.CoreV1().Namespaces().Get(ctx, options.LeaseLockNamespace, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	config.ClusterIdentity = string(ns.UID)
+
+	if options.ClusterName == "" {
+		config.ClusterName = config.ClusterIdentity
+	} else {
+		config.ClusterName = options.ClusterName
+	}
+
+	return nil
+
 }

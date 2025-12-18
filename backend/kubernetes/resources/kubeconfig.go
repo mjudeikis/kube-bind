@@ -33,6 +33,8 @@ import (
 	"k8s.io/client-go/util/retry"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	kubebindv1alpha2 "github.com/kube-bind/kube-bind/sdk/apis/kubebind/v1alpha2"
 )
 
 func GenerateKubeconfig(ctx context.Context,
@@ -150,5 +152,35 @@ func NewFixedExternalAddressGenerator(address string) ExternalAddressGeneratorFu
 		}
 
 		return address, nil
+	}
+}
+
+type ClusterIdentityGeneratorFunc func(ctx context.Context, client client.Client, cluster *kubebindv1alpha2.Cluster) (*kubebindv1alpha2.ClusterIdentity, error)
+
+const kubeSystemNamespace = "kube-system"
+
+func NewFixedClusterIdentityGenerator() ClusterIdentityGeneratorFunc {
+	return func(ctx context.Context, client client.Client, _ *kubebindv1alpha2.Cluster) (*kubebindv1alpha2.ClusterIdentity, error) {
+		// Cluster identity is based on the UID of the kube-system namespace.
+		ns := &corev1.Namespace{}
+		if err := client.Get(ctx, types.NamespacedName{Name: kubeSystemNamespace}, ns); err != nil {
+			return nil, fmt.Errorf("failed to get namespace %q: %w", kubeSystemNamespace, err)
+		}
+
+		// Name is stored in the Kind: Cluster object inside the cluster.
+		cluster := &kubebindv1alpha2.Cluster{}
+		if err := client.Get(ctx, types.NamespacedName{Name: kubebindv1alpha2.DefaultClusterName}, cluster); err != nil {
+			return nil, fmt.Errorf("failed to get cluster %q: %w", kubebindv1alpha2.DefaultClusterName, err)
+		}
+
+		prettyName := cluster.Spec.PrettyName
+		if cluster.Spec.PrettyName == "" {
+			prettyName = string(ns.UID)
+		}
+
+		return &kubebindv1alpha2.ClusterIdentity{
+			UID:  string(ns.UID),
+			Name: prettyName,
+		}, nil
 	}
 }

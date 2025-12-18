@@ -39,6 +39,8 @@ type ExtraOptions struct {
 	LeaseLockNamespace string
 	LeaseLockIdentity  string
 
+	ClusterName string
+
 	ServerAddr string
 }
 
@@ -64,6 +66,7 @@ func NewOptions() *Options {
 			LeaseLockName:      "kube-bind",
 			LeaseLockNamespace: os.Getenv("POD_NAMESPACE"),
 			LeaseLockIdentity:  os.Getenv("POD_NAME"),
+			ClusterName:        "",
 		},
 	}
 
@@ -81,6 +84,8 @@ func (options *Options) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&options.LeaseLockName, "lease-name", options.LeaseLockName, "Name of lease lock")
 	fs.StringVar(&options.LeaseLockNamespace, "lease-namespace", options.LeaseLockNamespace, "Name of lease lock namespace")
 	fs.StringVar(&options.ServerAddr, "server-address", options.ServerAddr, "Address for server")
+
+	fs.StringVar(&options.ClusterName, "cluster-name", options.ClusterName, "Pretty name for the cluster")
 }
 
 func (options *Options) Complete() (*CompletedOptions, error) {

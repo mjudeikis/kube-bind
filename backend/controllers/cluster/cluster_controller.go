@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"reflect"
 
+	kuberesources "github.com/kube-bind/kube-bind/backend/kubernetes/resources"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -50,6 +51,7 @@ func NewClusterReconciler(
 	_ context.Context,
 	mgr mcmanager.Manager,
 	opts controller.TypedOptions[mcreconcile.Request],
+	clusterIdentityGenerator kuberesources.ClusterIdentityGeneratorFunc,
 	allowedGroups []string,
 	allowedUsers []string,
 ) (*ClusterReconciler, error) {
@@ -57,8 +59,9 @@ func NewClusterReconciler(
 		manager: mgr,
 		opts:    opts,
 		reconciler: reconciler{
-			allowedGroups: allowedGroups,
-			allowedUsers:  allowedUsers,
+			clusterIdentityGenerator: clusterIdentityGenerator,
+			allowedGroups:            allowedGroups,
+			allowedUsers:             allowedUsers,
 		},
 	}
 

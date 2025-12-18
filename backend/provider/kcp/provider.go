@@ -18,13 +18,14 @@ package kcp
 
 import (
 	"context"
+	"fmt"
 	"math"
+	"net/url"
+	"strings"
 	"time"
 
-	"github.com/kcp-dev/logicalcluster/v3"
 	provider "github.com/kcp-dev/multicluster-provider/apiexport"
-	"github.com/kcp-dev/multicluster-provider/pkg/handlers"
-	"github.com/kcp-dev/multicluster-provider/pkg/paths"
+	kcpcorev1alpha1 "github.com/kcp-dev/sdk/apis/core/v1alpha1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
@@ -32,20 +33,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/cluster"
 	"sigs.k8s.io/multicluster-runtime/pkg/multicluster"
 
+	kuberesources "github.com/kube-bind/kube-bind/backend/kubernetes/resources"
 	kubebindv1alpha2 "github.com/kube-bind/kube-bind/sdk/apis/kubebind/v1alpha2"
 )
 
 var _ multicluster.Provider = &Provider{}
 var _ multicluster.ProviderRunnable = &Provider{}
-var _ handlers.Handler = &pathHandler{}
-
-const (
-	// LogicalClusterPathAnnotationKey is the annotation key for the logical cluster path
-	// put on objects that are referenced by path by other objects.
-	//
-	// If this annotation exists, the system will maintain the annotation value.
-	LogicalClusterPathAnnotationKey = "kcp.io/path"
-)
 
 // Provider is a [sigs.k8s.io/multicluster-runtime/pkg/multicluster.Provider] that represents each [logical cluster]
 // (in the kcp sense) exposed via a APIExport virtual workspace as a cluster in the [sigs.k8s.io/multicluster-runtime] sense.
@@ -55,39 +48,24 @@ const (
 // [logical cluster]: https://docs.kcp.io/kcp/latest/concepts/terminology/#logical-cluster
 type Provider struct {
 	*provider.Provider
-	// pathStore maps logical cluster paths to cluster names.
-	pathStore *paths.Store
 }
 
 // New creates a new kcp virtual workspace provider. The provided [rest.Config]
 // must point to a virtual workspace apiserver base path, i.e. up to but without
 // the '/clusters/*' suffix. This information can be extracted from an APIExportEndpointSlice status.
 func New(cfg *rest.Config, endpointSliceName string, options provider.Options) (*Provider, error) {
-	store := paths.New()
-
-	h := &pathHandler{
-		pathStore: store,
-	}
-	options.Handlers = append(options.Handlers, h)
-
 	p, err := provider.New(cfg, endpointSliceName, options)
 	if err != nil {
 		return nil, err
 	}
 
 	return &Provider{
-		Provider:  p,
-		pathStore: store,
+		Provider: p,
 	}, nil
 }
 
 // Get returns the cluster with the given name as a cluster.Cluster.
 func (p *Provider) Get(ctx context.Context, clusterName string) (cluster.Cluster, error) {
-	if p.pathStore != nil {
-		if lcName, exists := p.pathStore.Get(clusterName); exists {
-			clusterName = lcName.String()
-		}
-	}
 	return p.Provider.Get(ctx, clusterName)
 }
 
@@ -149,30 +127,65 @@ func (a *awareWrapper) Engage(ctx context.Context, name string, cluster cluster.
 	return nil
 }
 
-type pathHandler struct {
-	pathStore *paths.Store
-}
+// NewKCPExternalAddressGenerator returns an ExternalAddressGeneratorFunc suitable for kcp clusters.
+func NewKCPExternalAddressGenerator(externalAddress string) (kuberesources.ExternalAddressGeneratorFunc, error) {
+	var extURL *url.URL
+	if externalAddress != "" {
+		var err error
 
-func (p *pathHandler) OnAdd(obj client.Object) {
-	cluster := logicalcluster.From(obj)
-
-	path := obj.GetAnnotations()[LogicalClusterPathAnnotationKey]
-	if path == "" {
-		return
+		extURL, err = url.Parse(externalAddress)
+		if err != nil {
+			return nil, fmt.Errorf("invalid --external-address: %w", err)
+		}
 	}
 
-	p.pathStore.Add(path, cluster)
+	return func(_ context.Context, clusterConfig *rest.Config) (string, error) {
+		// In kcp case, we are talking via apiexport so clientconfig will be pointing to
+		// https://192.168.2.166:6443/services/apiexport/root:org:ws/<apiexport-name>/clusters/2p0rtkf7b697s6mj
+		// We need to extract host and /clusters/... part
+		u, err := url.Parse(clusterConfig.Host)
+		if err != nil {
+			return "", err
+		}
+
+		// Extract cluster ID from the path
+		// Path format: /services/apiexport/root:org:ws/<apiexport-name>/clusters/{cluster-id}
+		pathParts := strings.Split(strings.Trim(u.Path, "/"), "/")
+		if len(pathParts) < 6 || pathParts[4] != "clusters" {
+			return "", fmt.Errorf("invalid apiexport URL format")
+		}
+
+		clusterID := pathParts[5]
+
+		// Construct new URL with cluster path
+		var finalURL = u
+		if extURL != nil {
+			finalURL = extURL
+		}
+
+		finalURL.Path = "/clusters/" + clusterID
+
+		return finalURL.String(), nil
+	}, nil
 }
 
-func (p *pathHandler) OnUpdate(oldObj, newObj client.Object) {
-	// Not used.
-}
+// NewKCPClusterIdentityGenerator returns a ClusterIdentityGeneratorFunc suitable for kcp clusters based on logical cluster names.
+func NewKCPClusterIdentityGenerator() (kuberesources.ClusterIdentityGeneratorFunc, error) {
+	return func(ctx context.Context, c client.Client, cluster *kubebindv1alpha2.Cluster) (*kubebindv1alpha2.ClusterIdentity, error) {
+		logicalCluster := &kcpcorev1alpha1.LogicalCluster{}
+		err := c.Get(ctx, client.ObjectKey{Name: kcpcorev1alpha1.LogicalClusterName}, logicalCluster)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get logical cluster for cluster %s: %w", cluster.Name, err)
+		}
 
-func (p *pathHandler) OnDelete(obj client.Object) {
-	path, ok := obj.GetAnnotations()[LogicalClusterPathAnnotationKey]
-	if !ok {
-		return
-	}
+		clusterName := logicalCluster.GetAnnotations()["kcp.io/cluster"]
+		if clusterName == "" {
+			clusterName = string(logicalCluster.UID)
+		}
 
-	p.pathStore.Remove(path)
+		return &kubebindv1alpha2.ClusterIdentity{
+			Name: clusterName,
+			UID:  string(logicalCluster.UID),
+		}, nil
+	}, nil
 }

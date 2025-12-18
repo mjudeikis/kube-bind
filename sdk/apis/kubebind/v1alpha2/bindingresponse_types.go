@@ -87,6 +87,9 @@ type BindableResourcesRequest struct {
 	metav1.ObjectMeta `json:"metadata"`
 
 	TemplateRef APIServiceExportTemplateRef `json:"templateRef"`
+	// ClusterIdentity contains information that uniquely identifies the cluster.
+	// When doing dry run, we expect the client to fill this field in (or it will be taked from local cluster where context is available).
+	ClusterIdentity ClusterIdentity `json:"clusterIdentity"`
 }
 
 type APIServiceExportTemplateRef struct {
